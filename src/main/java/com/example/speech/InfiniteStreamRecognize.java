@@ -32,6 +32,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+/*
+ * Google Voice stuff
+ */
 public class InfiniteStreamRecognize {
 
     private static final int STREAMING_LIMIT = Long.valueOf(TimeUnit.SECONDS.toMillis(10)).intValue(); // ~5 minutes
@@ -57,21 +60,6 @@ public class InfiniteStreamRecognize {
     private static StreamController referenceToStreamController;
     private static ByteString tempByteString;
 
-    public static void main(String... args) {
-//        InfiniteStreamRecognizeOptions options = InfiniteStreamRecognizeOptions.fromFlags(args);
-//        if (options == null) {
-//            // Could not parse.
-//            System.out.println("Failed to parse options.");
-//            System.exit(1);
-//        }
-
-        try {
-            infiniteStreamingRecognize("en-US");
-        } catch (Exception e) {
-            System.out.println("Exception caught: " + e);
-        }
-    }
-
     public static String convertMillisToDate(double milliSeconds) {
         long millis = (long) milliSeconds;
         DecimalFormat format = new DecimalFormat();
@@ -87,35 +75,6 @@ public class InfiniteStreamRecognize {
      * Performs infinite streaming speech recognition
      */
     public static void infiniteStreamingRecognize(String languageCode) throws Exception {
-
-//        // Microphone Input buffering
-//        class MicBuffer implements Runnable {
-//
-//            @Override
-//            public void run() {
-//                System.out.println(YELLOW);
-//                System.out.println("Start speaking...Press Ctrl-C to stop");
-//                targetDataLine.start();
-//                byte[] data = new byte[BYTES_PER_BUFFER];
-//                while (targetDataLine.isOpen()) {
-//                    try {
-//                        int numBytesRead = targetDataLine.read(data, 0, data.length);
-//                        if ((numBytesRead <= 0) && (targetDataLine.isOpen())) {
-//                            continue;
-//                        }
-//                        sharedQueue.put(data.clone());
-//                    } catch (InterruptedException e) {
-//                        System.out.println("Microphone input buffering interrupted : " + e.getMessage());
-//                    }
-//                }
-//            }
-//        }
-
-        // Creating microphone input buffer thread
-        //MicBuffer micrunnable = new MicBuffer();
-        //Thread micThread = new Thread(micrunnable);
-
-
         ResponseObserver<StreamingRecognizeResponse> responseObserver = null;
         try (SpeechClient client = SpeechClient.create()) {
             ClientStream<StreamingRecognizeRequest> clientStream;
@@ -187,27 +146,8 @@ public class InfiniteStreamRecognize {
             clientStream.send(request);
 
             try {
-                // SampleRate:16000Hz, SampleSizeInBits: 16, Number of channels: 1, Signed: true,
-                // bigEndian: false
-//                AudioFormat audioFormat = new AudioFormat(16000, 16, 1, true, false);
-//                DataLine.Info targetInfo =
-//                        new Info(
-//                                TargetDataLine.class,
-//                                audioFormat); // Set the system information to read from the microphone audio
-//                // stream
-//
-//                if (!AudioSystem.isLineSupported(targetInfo)) {
-//                    System.out.println("Microphone not supported");
-//                    System.exit(0);
-//                }
-//                // Target data line captures the audio stream the microphone produces.
-//                targetDataLine = (TargetDataLine) AudioSystem.getLine(targetInfo);
-//                targetDataLine.open(audioFormat);
-                //micThread.start();
-
                 long startTime = System.currentTimeMillis();
                 System.out.println("> Listening to audio.");
-
                 while (true) {
                     long estimatedTime = System.currentTimeMillis() - startTime;
                     if (estimatedTime >= STREAMING_LIMIT) {
@@ -281,4 +221,3 @@ public class InfiniteStreamRecognize {
     }
 
 }
-// [END speech_transcribe_infinite_streaming]

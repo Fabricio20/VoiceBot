@@ -17,18 +17,18 @@ package net.notfab.alexaondiscord;
  */
 
 import com.example.speech.InfiniteStreamRecognize;
-import net.dv8tion.jda.api.JDABuilder;
-import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.audio.AudioReceiveHandler;
 import net.dv8tion.jda.api.audio.AudioSendHandler;
 import net.dv8tion.jda.api.audio.CombinedAudio;
+import net.dv8tion.jda.api.audio.UserAudio;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.managers.AudioManager;
+import net.notfab.alexa.jni.manager.PorcupineManagerException;
+import org.jetbrains.annotations.NotNull;
 
 import javax.security.auth.login.LoginException;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -37,14 +37,18 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Main extends ListenerAdapter {
 
-    public static void main(String[] args) throws LoginException {
-        new JDABuilder(System.getenv("DISCORDO"))                            // Use provided token from command line arguments
-                .addEventListeners(new Main())  // Start listening with this listener
-                .setActivity(Activity.listening("to jams")) // Inform users that we are jammin' it out
-                .setStatus(OnlineStatus.DO_NOT_DISTURB)     // Please don't disturb us while we're jammin'
-                .build();                                   // Login with these options
+    public static void main(String[] args) throws LoginException, PorcupineManagerException {
+        SpeechHandler handler = new SpeechHandler();
+        // TODO: Start JDA here
+//        new JDABuilder(System.getenv("DISCORDO"))                            // Use provided token from command line arguments
+//                .addEventListeners(new Main())  // Start listening with this listener
+//                .setActivity(Activity.listening("to jams")) // Inform users that we are jammin' it out
+//                .setStatus(OnlineStatus.DO_NOT_DISTURB)     // Please don't disturb us while we're jammin'
+//                .build();                                   // Login with these options
         // Note that its not needed to explicitly enable audio here
     }
+
+    SpeechHandler handler;
 
     @Override
     public void onGuildMessageReceived(GuildMessageReceivedEvent event) {
@@ -56,6 +60,14 @@ public class Main extends ListenerAdapter {
         // Ignore message if bot
         if (author.isBot())
             return;
+
+        try {
+            if (handler == null) {
+                handler = new SpeechHandler();
+            }
+        } catch (PorcupineManagerException e) {
+            e.printStackTrace();
+        }
 
         if (content.startsWith("!echo ")) {
             String arg = content.substring("!echo ".length());
@@ -160,22 +172,22 @@ public class Main extends ListenerAdapter {
         private OutputStream outputStream;
 
         public EchoHandler() {
-            new Thread(() -> {
-                ProcessBuilder builder = new ProcessBuilder("ffmpeg", "-f", "s16be", "-ar", "48k", "-ac", "2", "-i", "pipe:0", "somefile.wav");
-                Process process;
-                try {
-                    process = builder.start();
-                    outputStream = process.getOutputStream();
-                    System.out.println("Started ffmpeg");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+//            new Thread(() -> {
+//                ProcessBuilder builder = new ProcessBuilder("ffmpeg", "-f", "s16be", "-ar", "48k", "-ac", "2", "-i", "pipe:0", "somefile.wav");
+//                Process process;
+//                try {
+//                    process = builder.start();
+//                    outputStream = process.getOutputStream();
+//                    System.out.println("Started ffmpeg");
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
 //                try {
 //                    InfiniteStreamRecognize.infiniteStreamingRecognize("en-US");
 //                } catch (Exception e) {
 //                    e.printStackTrace();
 //                }
-            }).start();
+//            }).start();
         }
 
         /*
@@ -194,7 +206,9 @@ public class Main extends ListenerAdapter {
         @Override // combine multiple user audio-streams into a single one
         public boolean canReceiveCombined() {
             // limit queue to 10 entries, if that is exceeded we can not receive more until the send system catches up
-            return queue.size() < 10;
+            //return queue.size() < 10;
+            // TODO: Enable google voice and echo bot here
+            return false;
         }
 
         @Override
@@ -204,40 +218,45 @@ public class Main extends ListenerAdapter {
                 return;
 
             byte[] data = combinedAudio.getAudioData(1.0f); // volume at 100% = 1.0 (50% = 0.5 / 55% = 0.55)
-            queue.add(data);
+            SpeechHandler.pcmQueue.add(data);
+            //queue.add(data);
         }
-/*
-        Disable per-user audio since we want to echo the entire channel and not specific users.
 
         @Override // give audio separately for each user that is speaking
-        public boolean canReceiveUser()
-        {
+        public boolean canReceiveUser() {
             // this is not useful if we want to echo the audio of the voice channel, thus disabled for this purpose
-            return false;
+            return true;
         }
 
         @Override
-        public void handleUserAudio(UserAudio userAudio) {} // per-user is not helpful in an echo system
-*/
+        public void handleUserAudio(@NotNull UserAudio userAudio) {
+            if (!"87166524837613568".equals(userAudio.getUser().getId())) {
+                return;
+            }
+            byte[] data = userAudio.getAudioData(1.0f); // volume at 100% = 1.0 (50% = 0.5 / 55% = 0.55)
+            SpeechHandler.pcmQueue.add(data);
+        }
 
         /* Send Handling */
 
         @Override
         public boolean canProvide() {
+            // TODO: Enable echo bot and google cloud here
             // If we have something in our buffer we can provide it to the send system
-            return !queue.isEmpty();
+            //return !queue.isEmpty();
+            return false;
         }
 
         @Override
         public ByteBuffer provide20MsAudio() {
             // use what we have in our buffer to send audio as PCM
+            // TODO: Echo bot part (InfiniteStreamRecognize = Sends to Google Cloud)
             byte[] data = queue.poll();
             if (data != null && InfiniteStreamRecognize.sharedQueue != null) {
                 try {
                     //System.out.println("20ms to google");
                     byte[] array = data.clone();
-                    for (int i = 0, j = array.length - 1; i < j; i++, j--)
-                    {
+                    for (int i = 0, j = array.length - 1; i < j; i++, j--) {
                         byte b = array[i];
                         array[i] = array[j];
                         array[j] = b;
